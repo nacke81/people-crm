@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>People</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1d1d1b; --mute:#77736b; --line:#e4e0d6; --accent:#2f6f5e; --warn:#b5482f; --gold:#b8862b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); padding-bottom:84px; }
+  header { padding:18px 18px 6px; display:flex; justify-content:space-between; align-items:baseline; }
+  header h1 { margin:0; font-size:26px; }
+  .banner { margin:0 18px 10px; padding:6px 10px; border-radius:8px; background:#fff4d6; color:#6b5216; font-size:13px; }
+  main { padding:0 14px; max-width:640px; margin:0 auto; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:18px 4px 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+  .card.click { cursor:pointer; }
+  .av { width:40px; height:40px; border-radius:50%; display:grid; place-items:center; font-weight:600; color:#fff; flex:none; }
+  .grow { flex:1; min-width:0; }
+  .name { font-weight:600; }
+  .sub { color:var(--mute); font-size:14px; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:99px; white-space:nowrap; }
+  .late { background:#fbe4de; color:var(--warn); }
+  .bday { background:#f7ecd5; color:var(--gold); }
+  .ok { background:#e2efe9; color:var(--accent); }
+  button { font:inherit; border:0; border-radius:10px; padding:9px 14px; cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; }
+  .ghost { background:#ece8de; color:var(--ink); }
+  .small { padding:6px 10px; font-size:14px; }
+  nav { position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--line); display:flex; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  nav button { flex:1; background:none; color:var(--mute); font-size:13px; }
+  nav button.on { color:var(--accent); font-weight:600; }
+  nav .n { display:block; font-size:20px; }
+  .empty { text-align:center; color:var(--mute); padding:30px 10px; }
+  input, select, textarea { font:inherit; width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  label { display:block; font-size:13px; color:var(--mute); margin:12px 2px 4px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .err { color:var(--warn); font-size:14px; margin-top:8px; min-height:1em; }
+  .detail { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .kv { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); }
+  .kv:last-child { border:0; }
+  ul.gifts { margin:6px 0 0; padding-left:20px; }
+  .back { background:none; color:var(--accent); padding:4px 0; }
+  .search { margin:4px 0 6px; }
+  .toast { position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:99px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<header><h1 id="title">Due now</h1><span class="sub">Signed in as mike (fake)</span></header>
+<div class="banner">Prototype: fake people, saved only in this browser. Nothing is real yet.</div>
+<main id="app"></main>
+<nav>
+  <button data-tab="due" class="on"><span class="n">●</span>Due now</button>
+  <button data-tab="people"><span class="n">☰</span>People</button>
+  <button data-tab="add"><span class="n">＋</span>Add</button>
+</nav>
+<div class="toast" id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
