@@ -23,6 +23,19 @@ test("touched today clears someone from the due list", () => {
 
 test("validation gives friendly errors", () => {
   assert.deepEqual(validate({ name: " ", cadenceDays: "0", birthday: "march" }),
-    ["Name is required.", "Stay in touch every 1 to 730 days.", "Birthday looks wrong."]);
+    ["Name is required.", "Stay in touch every 1 to 730 days.", "Birthday should look like 5/17/1986."]);
   assert.deepEqual(validate({ name: "Al", cadenceDays: "", birthday: "" }), []);
+});
+
+import { usDate, parseUsDate } from "../site/logic.js";
+
+test("review fix 1: dates show as 5/17/1986 (Mike's format)", () => {
+  assert.equal(usDate("1986-05-17"), "5/17/1986");
+  assert.equal(usDate("12-03"), "12/3");
+  assert.equal(parseUsDate("5/17/1986"), "1986-05-17");
+  assert.equal(parseUsDate("05/17/1986"), "1986-05-17");
+  assert.equal(parseUsDate("2/29"), "02-29");
+  assert.equal(parseUsDate("2/30/1990"), null);
+  assert.equal(parseUsDate("1986-05-17"), "1986-05-17");
+  assert.deepEqual(validate({ name: "A", cadenceDays: "", birthday: "13/1/1990" }), ["Birthday should look like 5/17/1986."]);
 });

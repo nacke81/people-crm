@@ -1,4 +1,4 @@
-import { dueList, birthdaysSoon, overdueDays, daysToBirthday, nextFollowUp, touch, validate, isoDay, parseDay } from "./logic.js";
+import { dueList, birthdaysSoon, overdueDays, daysToBirthday, nextFollowUp, touch, validate, isoDay, parseDay, usDate, parseUsDate } from "./logic.js";
 import { seedPeople } from "./seed.js";
 
 const KEY = "pcrm.v1";
@@ -85,7 +85,7 @@ const views = {
       <label>Relationship</label><input name="relationship" value="${esc(v.relationship)}" placeholder="Friend, Family, Mentor...">
       <div class="row">
         <div><label>Stay in touch every (days)</label><input name="cadenceDays" inputmode="numeric" value="${esc(v.cadenceDays ?? "")}"></div>
-        <div><label>Birthday (YYYY-MM-DD)</label><input name="birthday" value="${esc(v.birthday || "")}" placeholder="1985-03-14"></div>
+        <div><label>Birthday</label><input name="birthday" inputmode="numeric" value="${esc(usDate(v.birthday))}" placeholder="5/17/1986"></div>
       </div>
       <label>Notes</label><textarea name="notes" rows="3">${esc(v.notes)}</textarea>
       <div class="err" id="err"></div>
@@ -97,7 +97,7 @@ const views = {
       const d = Object.fromEntries(new FormData(e.target));
       const errs = validate(d);
       if (errs.length) { document.getElementById("err").textContent = errs.join(" "); return; }
-      const rec = { ...d, name: d.name.trim(), cadenceDays: d.cadenceDays === "" ? null : Number(d.cadenceDays), birthday: d.birthday || null };
+      const rec = { ...d, name: d.name.trim(), cadenceDays: d.cadenceDays === "" ? null : Number(d.cadenceDays), birthday: parseUsDate(d.birthday) || null };
       if (p) Object.assign(p, rec);
       else people.push({ id: "p" + Date.now(), lastTouched: isoDay(today()), followUp: null, gifts: [], ...rec });
       save(); toast("Saved");
@@ -116,11 +116,11 @@ const views = {
         <button class="primary" id="touch" style="width:100%;margin:6px 0 10px">Touched today</button>
         <div class="kv"><span class="sub">Last touched</span><span>${ago(p.lastTouched)}</span></div>
         <div class="kv"><span class="sub">Stay in touch</span><span>${p.cadenceDays ? `every ${p.cadenceDays} days` : "no schedule"}</span></div>
-        <div class="kv"><span class="sub">Next follow-up</span><span>${nf ? isoDay(nf) : "—"}</span></div>
-        <div class="kv"><span class="sub">Birthday</span><span>${p.birthday ? `${esc(p.birthday)}${bd !== null ? ` (in ${bd}d)` : ""}` : "—"}</span></div>
+        <div class="kv"><span class="sub">Next follow-up</span><span>${nf ? usDate(isoDay(nf)) : "—"}</span></div>
+        <div class="kv"><span class="sub">Birthday</span><span data-testid="bday">${p.birthday ? `${esc(usDate(p.birthday))}${bd !== null ? ` (in ${bd}d)` : ""}` : "—"}</span></div>
         <div class="kv" style="display:block"><span class="sub">Gift ideas</span>
           <ul class="gifts">${(p.gifts || []).map((g, i) => `<li>${esc(g)} <button class="ghost small" data-delgift="${i}">✕</button></li>`).join("") || `<li class="sub">none yet</li>`}</ul>
-          <div class="row" style="margin-top:8px"><input id="gift" placeholder="Add a gift idea"><button class="ghost" id="addgift" style="flex:none">Add</button></div>
+          <form id="giftform" class="row" style="margin-top:8px"><input id="gift" placeholder="Add a gift idea" enterkeyhint="enter" autocomplete="off"><button class="ghost" id="addgift" type="submit" style="flex:none">Add</button></form>
         </div>
         <div class="kv" style="display:block"><span class="sub">Notes</span><div style="white-space:pre-wrap;margin-top:4px">${esc(p.notes) || `<span class="sub">—</span>`}</div></div>
         <div class="row" style="margin-top:12px"><button class="ghost" id="edit">Edit</button><button class="ghost" id="del" style="color:var(--warn)">Delete</button></div>
@@ -129,10 +129,13 @@ const views = {
     document.getElementById("touch").onclick = () => { Object.assign(p, touch(p, today())); save(); toast(`Logged: ${p.name}`); render(); };
     document.getElementById("edit").onclick = () => views.add(p);
     document.getElementById("del").onclick = () => { if (confirm(`Delete ${p.name}?`)) { people = people.filter((x) => x !== p); save(); go("#/people"); } };
-    document.getElementById("addgift").onclick = () => {
+    // Return on the keyboard adds the gift (a form submit), then the box stays focused for the next one.
+    document.getElementById("giftform").onsubmit = (e) => {
+      e.preventDefault();
       const g = document.getElementById("gift").value.trim();
       if (!g) return;
       p.gifts = [...(p.gifts || []), g]; save(); render();
+      document.getElementById("gift").focus();
     };
     $app.querySelectorAll("[data-delgift]").forEach((b) => (b.onclick = () => { p.gifts.splice(Number(b.dataset.delgift), 1); save(); render(); }));
   },
