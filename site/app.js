@@ -11,8 +11,18 @@ const COLORS = ["#2f6f5e", "#b5482f", "#b8862b", "#4b5d9c", "#7a4f8f", "#3f7f9a"
 let people = [];
 let loaded = false; // nothing is drawn as "empty" until the database has answered
 // Every change is saved to the database for that one person. If the save fails, say so and reload the truth.
+// Writes for one person go out one at a time, in order. Each write sends the person as they are when it actually goes out,
+// so the latest state wins and a slow earlier request can never land after a later one. The UI never waits on this.
+const chains = new Map(); // person id -> promise of the last queued write
+function queue(id, job) {
+  const next = (chains.get(id) || Promise.resolve()).then(job);
+  const tail = next.catch(() => {});
+  chains.set(id, tail);
+  tail.then(() => { if (chains.get(id) === tail) chains.delete(id); });
+  return next;
+}
 async function save(p) {
-  try { await store.put(p); }
+  try { await queue(p.id, () => store.put(p)); }
   catch (e) { toast("Not saved: " + (e.message || e)); await reload(); }
 }
 async function reload() {
@@ -141,7 +151,7 @@ const views = {
     document.getElementById("back").onclick = () => history.back();
     document.getElementById("touch").onclick = () => { Object.assign(p, touch(p, today())); save(p); toast(`Logged: ${p.name}`); render(); };
     document.getElementById("edit").onclick = () => views.add(p);
-    document.getElementById("del").onclick = () => { if (confirm(`Delete ${p.name}?`)) { people = people.filter((x) => x !== p); store.remove(p.id).catch((e) => { toast("Not deleted: " + e.message); reload(); }); go("#/people"); } };
+    document.getElementById("del").onclick = () => { if (confirm(`Delete ${p.name}?`)) { people = people.filter((x) => x !== p); queue(p.id, () => store.remove(p.id)).catch((e) => { toast("Not deleted: " + e.message); reload(); }); go("#/people"); } };
     // Return on the keyboard adds the gift (a form submit), then the box stays focused for the next one.
     document.getElementById("giftform").onsubmit = (e) => {
       e.preventDefault();

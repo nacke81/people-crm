@@ -47,6 +47,9 @@ jobs:
           sleep 1
           python tests/e2e.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
 
+      - name: Ordered saves - two quick gift adds, first save delayed, both kept (real browser, hosted database)
+        run: python tests/ordered_saves.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
+
       - name: Golden 4 - export, wipe, import, identical data back (real browser, hosted database)
         run: python tests/golden4.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
 
