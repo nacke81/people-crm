@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { serialize, parseImport, exportFileName, rowProblems } from "../site/transfer.js";
+import { serialize, parseImport, exportFileName, rowProblems, friendlyImportError } from "../site/transfer.js";
 
 const A = { id: "11111111-1111-4111-8111-111111111111", name: "Ann", relationship: "Friend", lastTouched: "2026-10-01", cadenceDays: 30, followUp: null, birthday: "1986-05-17", gifts: ["Bourbon", "Book"], notes: "Line1\nLine2", owner: "secret-owner" };
 const B = { id: "22222222-2222-4222-8222-222222222222", name: "Bo", relationship: "", lastTouched: null, cadenceDays: null, followUp: "2026-11-02", birthday: "03-09", gifts: [], notes: "" };
@@ -47,4 +47,19 @@ test("rowProblems rejects impossible dates, accepts 02-29", () => {
   assert.deepEqual(rowProblems({ ...B, birthday: "02-29" }), []);
   assert.equal(rowProblems({ ...B, lastTouched: "2026-02-30" }).length, 1);
   assert.equal(rowProblems(null).length, 1);
+});
+
+test("QA: an export with zero people is refused with a friendly message", () => {
+  const r = parseImport(JSON.stringify({ app: "people-crm", version: 1, exported: "2026-10-12T00:00:00Z", people: [] }));
+  assert.equal(r.ok, false);
+  assert.match(r.errors[0], /no people/i);
+});
+
+test("QA: database refusals become friendly text, never raw Postgres", () => {
+  const rls = friendlyImportError({ code: "42501", message: 'new row violates row-level security policy (USING expression) for table "people"' });
+  assert.match(rls, /another account/i);
+  assert.doesNotMatch(rls, /row-level|policy|postgres|42501/i);
+  assert.match(friendlyImportError({ message: "Failed to fetch" }), /connection|try again/i);
+  assert.match(friendlyImportError(new Error("weird")), /try again/i);
+  assert.doesNotMatch(friendlyImportError(new Error("weird")), /weird/);
 });

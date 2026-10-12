@@ -1,5 +1,5 @@
 import { dueList, birthdaysSoon, overdueDays, daysToBirthday, nextFollowUp, touch, validate, isoDay, parseDay, usDate, parseUsDate } from "./logic.js";
-import { serialize, exportFileName, parseImport } from "./transfer.js";
+import { serialize, exportFileName, parseImport, friendlyImportError } from "./transfer.js";
 import { createStore } from "./store.js";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
@@ -179,7 +179,7 @@ function wireTransfer() {
     document.getElementById("importno").onclick = () => { box.innerHTML = ""; };
     document.getElementById("importgo").onclick = async () => {
       try { await store.putMany(r.people); toast(`Imported ${n}`); await reload(); }
-      catch (e) { box.innerHTML = `<div class="detail" style="margin-top:10px"><div class="err" data-testid="import-error">Not imported: ${esc(e.message || e)}</div></div>`; }
+      catch (e) { box.innerHTML = `<div class="detail" style="margin-top:10px"><div class="err" data-testid="import-error">${esc(friendlyImportError(e))}</div></div>`; }
     };
   };
 }

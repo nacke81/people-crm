@@ -59,6 +59,7 @@ export function parseImport(text) {
   if (d.version !== VERSION)
     return { ok: false, errors: [`That export is version ${d.version === undefined ? "unknown" : JSON.stringify(d.version)}; this app reads version ${VERSION}.`] };
   if (!Array.isArray(d.people)) return { ok: false, errors: ["That export has no list of people."] };
+  if (d.people.length === 0) return { ok: false, errors: ["That export has no people in it, so there is nothing to import."] };
   const errors = [];
   const seen = new Set();
   d.people.forEach((r, i) => {
@@ -70,4 +71,14 @@ export function parseImport(text) {
   });
   if (errors.length) return { ok: false, errors };
   return { ok: true, people: d.people.map(cleanPerson) };
+}
+
+// Database / network failure -> friendly text. Never shows raw Postgres wording.
+export function friendlyImportError(e) {
+  const msg = String((e && e.message) || e || "");
+  if ((e && (e.code === "42501" || e.code === "PGRST301")) || /row-level security|permission denied|policy/i.test(msg))
+    return "Not imported. Some of these people already belong to another account, so they can't be imported here. Nothing was changed.";
+  if (/failed to fetch|network|load failed|timeout/i.test(msg))
+    return "Not imported. The connection dropped. Check your connection and try again.";
+  return "Not imported. Something went wrong. Please try again.";
 }
