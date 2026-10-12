@@ -47,6 +47,9 @@ jobs:
           sleep 1
           python tests/e2e.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
 
+      - name: Golden 4 - export, wipe, import, identical data back (real browser, hosted database)
+        run: python tests/golden4.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
+
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'  # PRs test only; main deploys

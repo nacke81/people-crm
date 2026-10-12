@@ -22,6 +22,11 @@ export function createStore(sb) {
       const { error } = await sb.from("people").upsert(toRow(p));
       if (error) throw error;
     },
+    async putMany(list) { // import: upsert by id, so re-importing never duplicates; owner is never sent
+      if (!list.length) return;
+      const { error } = await sb.from("people").upsert(list.map(toRow));
+      if (error) throw error;
+    },
     async remove(id) {
       const { error } = await sb.from("people").delete().eq("id", id);
       if (error) throw error;
