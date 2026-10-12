@@ -31,6 +31,16 @@ def rows():
     return sorted(api("GET", f"/rest/v1/people?owner=eq.{uid}&select={FIELDS}"), key=lambda r: r["name"])
 
 
+def wait_db(cond, what, secs=20):
+    """Poll the database until cond(rows()) is true. Replaces fixed sleeps."""
+    end = time.time() + secs
+    while time.time() < end:
+        if cond(rows()):
+            return
+        time.sleep(0.2)
+    print("  timed out waiting for: " + what, flush=True)
+
+
 def code_for(since):
     for _ in range(40):
         q = json.load(urllib.request.urlopen(mail + "/api/v1/search?query=" + urllib.parse.quote("to:" + email)))["messages"]
@@ -89,7 +99,7 @@ try:
                     pg.locator("#gift").click(); pg.keyboard.type(g); pg.keyboard.press("Enter")
                     pg.wait_for_function("n => document.querySelectorAll('.gifts li:not(.sub)').length >= n", arg=i)
                 pg.locator("nav [data-tab=people]").click(); pg.wait_for_selector("#list")
-        pg.wait_for_timeout(1500)
+        wait_db(lambda r: len(r) == 3 and [x["gifts"] for x in r] == [["Bourbon", "Tea set"], ["Book: Deep Work"], []], "3 people with their gifts saved")
         # Give each person a different last-touched day (the UI stamps today on add).
         for n, d in LAST.items():
             api("PATCH", f"/rest/v1/people?owner=eq.{uid}&name=eq.{urllib.parse.quote(n)}", {"last_touched": d})
@@ -115,7 +125,7 @@ try:
         for name, *_ in PEOPLE:
             pg.locator("#list .card", has_text=name).click(); pg.wait_for_selector("#del")
             pg.locator("#del").click(); pg.wait_for_selector("#list")
-        pg.wait_for_timeout(1500)
+        wait_db(lambda r: r == [], "all 3 people deleted")
         check("wiped: 0 people in the database", rows() == [])
         check("wiped: list is empty in the UI", pg.locator("[data-testid=row]").count() == 0)
 
@@ -146,7 +156,8 @@ try:
 
         # importing the same file again must not duplicate
         pg.set_input_files("#importfile", path)
-        pg.wait_for_selector("[data-testid=import-ask]"); pg.locator("#importgo").click(); pg.wait_for_timeout(1500)
+        pg.wait_for_selector("[data-testid=import-ask]"); pg.locator("#importgo").click()
+        pg.wait_for_selector("[data-testid=import-ask]", state="detached")  # import finished and the list reloaded
         check("re-import: still exactly 3, still identical", rows() == before)
 
         # gifts and notes show on the person page too
