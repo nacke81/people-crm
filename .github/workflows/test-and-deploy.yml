@@ -17,14 +17,33 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Syntax check (.mjs copies; plain .js passes broken ESM)
         run: for f in site/*.js; do cp "$f" /tmp/chk.mjs && node --check /tmp/chk.mjs || exit 1; done
-      - run: npm test
+      - name: Golden 3 + unit tests
+        run: npm test
+      - name: Golden 2 - isolation against the hosted database (must be 14 of 14)
+        run: node tests/isolation.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser
+        run: pip install playwright && python -m playwright install --with-deps --only-shell chromium
+      - name: Golden 1 - phone adds, laptop sees it (real browser, hosted database)
+        run: |
+          python -m http.server 8821 --bind 127.0.0.1 --directory site &
+          sleep 1
+          python tests/e2e.py http://127.0.0.1:8821/ "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$SUPABASE_SECRET_KEY"
 
   deploy:
     needs: test

@@ -1,19 +1,24 @@
 import { dueList, birthdaysSoon, overdueDays, daysToBirthday, nextFollowUp, touch, validate, isoDay, parseDay, usDate, parseUsDate } from "./logic.js";
-import { seedPeople } from "./seed.js";
+import { createStore } from "./store.js";
+import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
-const KEY = "pcrm.v1";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const store = createStore(sb);
 const today = () => new Date();
 const COLORS = ["#2f6f5e", "#b5482f", "#b8862b", "#4b5d9c", "#7a4f8f", "#3f7f9a", "#8a6b3d"];
 
-function load() {
-  const raw = localStorage.getItem(KEY);
-  if (raw) return JSON.parse(raw);
-  const people = seedPeople(today());
-  localStorage.setItem(KEY, JSON.stringify(people)); // starter state persists on first load
-  return people;
+let people = [];
+let loaded = false; // nothing is drawn as "empty" until the database has answered
+// Every change is saved to the database for that one person. If the save fails, say so and reload the truth.
+async function save(p) {
+  try { await store.put(p); }
+  catch (e) { toast("Not saved: " + (e.message || e)); await reload(); }
 }
-let people = load();
-const save = () => localStorage.setItem(KEY, JSON.stringify(people));
+async function reload() {
+  try { people = await store.list(); loaded = true; document.body.dataset.loaded = "1"; }
+  catch (e) { toast("Couldn't load: " + (e.message || e)); }
+  render();
+}
 
 const $app = document.getElementById("app");
 const $title = document.getElementById("title");
@@ -61,6 +66,7 @@ const views = {
     const due = dueList(people, today());
     const bdays = birthdaysSoon(people, today());
     $app.innerHTML = `
+      ${people.length ? "" : `<div class="empty" data-testid="welcome">No people yet. Tap <b>＋ Add</b> to add the first one.</div>`}
       <h2>Follow up (${due.length})</h2>
       <div data-testid="due">${due.map((p) => row(p, `${statusTag(p)} <button class="primary small" data-touch="${p.id}">Touched</button>`)).join("") || `<div class="empty">Nobody's overdue. Nice.</div>`}</div>
       <h2>Birthdays, next 14 days (${bdays.length})</h2>
@@ -98,9 +104,10 @@ const views = {
       const errs = validate(d);
       if (errs.length) { document.getElementById("err").textContent = errs.join(" "); return; }
       const rec = { ...d, name: d.name.trim(), cadenceDays: d.cadenceDays === "" ? null : Number(d.cadenceDays), birthday: parseUsDate(d.birthday) || null };
+      let target = p;
       if (p) Object.assign(p, rec);
-      else people.push({ id: "p" + Date.now(), lastTouched: isoDay(today()), followUp: null, gifts: [], ...rec });
-      save(); toast("Saved");
+      else { target = { id: crypto.randomUUID(), lastTouched: isoDay(today()), followUp: null, gifts: [], ...rec }; people.push(target); }
+      save(target); toast("Saved");
       go(p ? `#/p/${p.id}` : "#/people");
     };
   },
@@ -126,24 +133,27 @@ const views = {
         <div class="row" style="margin-top:12px"><button class="ghost" id="edit">Edit</button><button class="ghost" id="del" style="color:var(--warn)">Delete</button></div>
       </div>`;
     document.getElementById("back").onclick = () => history.back();
-    document.getElementById("touch").onclick = () => { Object.assign(p, touch(p, today())); save(); toast(`Logged: ${p.name}`); render(); };
+    document.getElementById("touch").onclick = () => { Object.assign(p, touch(p, today())); save(p); toast(`Logged: ${p.name}`); render(); };
     document.getElementById("edit").onclick = () => views.add(p);
-    document.getElementById("del").onclick = () => { if (confirm(`Delete ${p.name}?`)) { people = people.filter((x) => x !== p); save(); go("#/people"); } };
+    document.getElementById("del").onclick = () => { if (confirm(`Delete ${p.name}?`)) { people = people.filter((x) => x !== p); store.remove(p.id).catch((e) => { toast("Not deleted: " + e.message); reload(); }); go("#/people"); } };
     // Return on the keyboard adds the gift (a form submit), then the box stays focused for the next one.
     document.getElementById("giftform").onsubmit = (e) => {
       e.preventDefault();
       const g = document.getElementById("gift").value.trim();
       if (!g) return;
-      p.gifts = [...(p.gifts || []), g]; save(); render();
+      p.gifts = [...(p.gifts || []), g]; save(p); render();
       document.getElementById("gift").focus();
     };
-    $app.querySelectorAll("[data-delgift]").forEach((b) => (b.onclick = () => { p.gifts.splice(Number(b.dataset.delgift), 1); save(); render(); }));
+    $app.querySelectorAll("[data-delgift]").forEach((b) => (b.onclick = () => { p.gifts.splice(Number(b.dataset.delgift), 1); save(p); render(); }));
   },
 };
 
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 
+let signedIn = false;
 function render() {
+  if (!signedIn) return;
+  if (!loaded) { $app.innerHTML = `<div class="empty">Loading...</div>`; return; }
   const h = location.hash || "#/due";
   const m = h.match(/^#\/p\/(.+)$/);
   const tab = m ? "people" : h.slice(2) || "due";
@@ -162,11 +172,70 @@ $app.addEventListener("click", (e) => {
   if (t) {
     e.stopPropagation();
     const p = people.find((x) => x.id === t.dataset.touch);
-    Object.assign(p, touch(p, today())); save(); toast(`Logged: ${p.name}`); render();
+    Object.assign(p, touch(p, today())); save(p); toast(`Logged: ${p.name}`); render();
     return;
   }
   const o = e.target.closest("[data-open]");
   if (o) go(`#/p/${o.dataset.open}`);
 });
 window.addEventListener("hashchange", render);
-render();
+
+// Sign in: email -> 6-digit code typed here (works the same on phone and laptop, no link juggling).
+function loginView() {
+  signedIn = false;
+  document.getElementById("nav").hidden = true;
+  document.getElementById("me").textContent = "";
+  $title.textContent = "People";
+  $app.innerHTML = `<form class="login" id="lf" novalidate>
+      <p>Sign in with your email. We'll send a 6-digit code.</p>
+      <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com">
+      <button class="primary" type="submit" style="width:100%;margin-top:10px">Email me a code</button>
+      <div class="err" id="lerr"></div>
+    </form>`;
+  document.getElementById("lf").onsubmit = async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const err = document.getElementById("lerr");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { err.textContent = "That email doesn't look right."; return; }
+    err.textContent = "Sending...";
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) { err.textContent = /signups? not allowed|not found/i.test(error.message) ? "That email isn't set up for this app." : error.message; return; }
+    codeView(email);
+  };
+}
+function codeView(email) {
+  $app.innerHTML = `<form class="login" id="cf" novalidate>
+      <p>Code sent to <b>${esc(email)}</b>. Type it here.</p>
+      <input id="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="••••••">
+      <button class="primary" type="submit" style="width:100%;margin-top:10px">Sign in</button>
+      <div class="err" id="cerr"></div>
+      <p class="sub" style="margin-top:10px"><a href="#" id="again">Use a different email</a></p>
+    </form>`;
+  document.getElementById("code").focus();
+  document.getElementById("again").onclick = (e) => { e.preventDefault(); loginView(); };
+  document.getElementById("cf").onsubmit = async (e) => {
+    e.preventDefault();
+    const token = document.getElementById("code").value.replace(/\D/g, "");
+    const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+    if (error) document.getElementById("cerr").textContent = "That code didn't work. Check it, or send a new one.";
+  };
+}
+async function enter(session) {
+  signedIn = true; loaded = false; delete document.body.dataset.loaded;
+  document.getElementById("nav").hidden = false;
+  document.getElementById("me").innerHTML = `${esc(session.user.email)} · <a href="#" id="signout">Sign out</a>`;
+  document.getElementById("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); };
+  $app.innerHTML = `<div class="empty">Loading...</div>`;
+  await reload();
+}
+
+let current;
+sb.auth.onAuthStateChange((event, session) => {
+  const id = session?.user?.id || null;
+  if (id === current) return; // token refreshes don't redraw
+  current = id;
+  setTimeout(() => (session ? enter(session) : loginView()), 0);
+});
+
+// Test hook: lets the hosted end-to-end check drive the real code screen without spending the email quota.
+window.__pcrm_codeView = codeView;

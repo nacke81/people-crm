@@ -43,20 +43,25 @@
   ul.gifts { margin:6px 0 0; padding-left:20px; }
   .back { background:none; color:var(--accent); padding:4px 0; }
   .search { margin:4px 0 6px; }
+  nav[hidden] { display:none; }
+  #me a { color:var(--accent); }
+  .login { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-top:20px; }
+  .login p { margin:0 0 10px; }
+  .code { letter-spacing:.3em; font-size:22px; text-align:center; }
   .toast { position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:8px 14px; border-radius:99px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.show { opacity:1; }
 </style>
 </head>
 <body>
-<header><h1 id="title">Due now</h1><span class="sub">Signed in as mike (fake)</span></header>
-<div class="banner">Prototype: fake people, saved only in this browser. Nothing is real yet.</div>
+<header><h1 id="title">People</h1><span class="sub" id="me"></span></header>
 <main id="app"></main>
-<nav>
+<nav id="nav" hidden>
   <button data-tab="due" class="on"><span class="n">●</span>Due now</button>
   <button data-tab="people"><span class="n">☰</span>People</button>
   <button data-tab="add"><span class="n">＋</span>Add</button>
 </nav>
 <div class="toast" id="toast"></div>
+<script src="vendor/supabase-2.117.3.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

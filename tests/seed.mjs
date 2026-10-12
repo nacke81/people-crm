@@ -1,6 +1,6 @@
 // Fake people for the prototype. Dates are relative to "today" so the demo never goes stale.
 // Built to the golden-test fixture: exactly 3 due, exactly 2 birthdays within 14 days.
-import { isoDay } from "./logic.js";
+import { isoDay } from "../site/logic.js";
 
 function ago(today, n) { return isoDay(new Date(today.getFullYear(), today.getMonth(), today.getDate() - n)); }
 function bdayIn(today, n, year) {

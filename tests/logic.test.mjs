@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dueList, birthdaysSoon, validate, touch, isoDay } from "../site/logic.js";
-import { seedPeople } from "../site/seed.js";
+import { seedPeople } from "./seed.mjs";
 
 const days = [new Date(2026, 9, 9), new Date(2026, 11, 28), new Date(2027, 1, 27), new Date(2028, 1, 29)];
 

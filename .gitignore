@@ -1,2 +1,5 @@
 node_modules/
 test-results/
+supabase/.temp/
+supabase/.branches/
+__pycache__/
