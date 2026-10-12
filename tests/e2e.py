@@ -45,7 +45,14 @@ def sign_in(pg):
     pg.fill("#email", email)
     if mail:
         since = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 2))
-        pg.locator("#lf button[type=submit]").click(); pg.wait_for_selector("#code")
+        # Auth allows one code email per second per address; a fast second sign-in can be refused. Retry, don't guess a pause.
+        for attempt in range(4):
+            pg.locator("#lf button[type=submit]").click()
+            try:
+                pg.wait_for_selector("#code", timeout=5000); break
+            except Exception:
+                if attempt == 3: raise
+                time.sleep(1.2)
         code = code_for(since)
     else:
         # Hosted: don't spend the 2-per-hour email quota. Mint a real one-time code with the admin key,
@@ -84,7 +91,10 @@ try:
         check("phone: person added", "Golden Test Person" in phone.locator("#list").inner_text())
         phone.locator("#list .card", has_text="Golden Test Person").click(); phone.wait_for_selector("#gift")
         phone.locator("#gift").click(); phone.keyboard.type("Bourbon"); phone.keyboard.press("Enter")
-        phone.wait_for_timeout(1500)
+        for _ in range(60):  # saved = the gift is in the database, not a fixed pause
+            if api("GET", f"/rest/v1/people?owner=eq.{uid}&select=gifts") == [{"gifts": ["Bourbon"]}]:
+                break
+            time.sleep(0.25)
 
         c2, laptop = ctx()
         sign_in(laptop)

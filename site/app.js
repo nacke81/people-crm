@@ -1,4 +1,5 @@
 import { dueList, birthdaysSoon, overdueDays, daysToBirthday, nextFollowUp, touch, validate, isoDay, parseDay, usDate, parseUsDate } from "./logic.js";
+import { serialize, exportFileName, parseImport, friendlyImportError } from "./transfer.js";
 import { createStore } from "./store.js";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
@@ -74,7 +75,12 @@ const views = {
   },
   people() {
     $title.textContent = "People";
-    $app.innerHTML = `<input class="search" id="q" placeholder="Search ${people.length} people" autocomplete="off"><div id="list"></div>`;
+    $app.innerHTML = `<input class="search" id="q" placeholder="Search ${people.length} people" autocomplete="off"><div id="list"></div>
+      <h2>Backup</h2>
+      <div class="row"><button class="ghost" id="export" type="button">Export</button><button class="ghost" id="import" type="button">Import</button></div>
+      <input type="file" id="importfile" accept=".json,application/json" hidden>
+      <div id="importbox" data-testid="importbox"></div>`;
+    wireTransfer();
     const draw = (q = "") => {
       const list = people.filter((p) => (p.name + " " + (p.relationship || "")).toLowerCase().includes(q.toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -147,6 +153,36 @@ const views = {
     $app.querySelectorAll("[data-delgift]").forEach((b) => (b.onclick = () => { p.gifts.splice(Number(b.dataset.delgift), 1); save(p); render(); }));
   },
 };
+
+function wireTransfer() {
+  const box = document.getElementById("importbox");
+  const file = document.getElementById("importfile");
+  document.getElementById("export").onclick = () => {
+    const url = URL.createObjectURL(new Blob([serialize(people, today())], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = exportFileName(today());
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Exported ${people.length} people`);
+  };
+  document.getElementById("import").onclick = () => { file.value = ""; file.click(); };
+  file.onchange = async () => {
+    const f = file.files[0];
+    if (!f) return;
+    const r = parseImport(await f.text());
+    if (!r.ok) {
+      box.innerHTML = `<div class="detail" style="margin-top:10px"><div class="err" data-testid="import-error">${r.errors.slice(0, 6).map(esc).join("<br>")}${r.errors.length > 6 ? `<br>...and ${r.errors.length - 6} more.` : ""}</div><div class="sub">Nothing was imported.</div></div>`;
+      return;
+    }
+    const n = r.people.length;
+    box.innerHTML = `<div class="detail" style="margin-top:10px"><div data-testid="import-ask"><b>Import ${n} ${n === 1 ? "person" : "people"}?</b></div><div class="sub">People already here with the same id are updated, not duplicated.</div><div class="row" style="margin-top:10px"><button class="primary" id="importgo" type="button">Import</button><button class="ghost" id="importno" type="button">Cancel</button></div></div>`;
+    document.getElementById("importno").onclick = () => { box.innerHTML = ""; };
+    document.getElementById("importgo").onclick = async () => {
+      try { await store.putMany(r.people); toast(`Imported ${n}`); await reload(); }
+      catch (e) { box.innerHTML = `<div class="detail" style="margin-top:10px"><div class="err" data-testid="import-error">${esc(friendlyImportError(e))}</div></div>`; }
+    };
+  };
+}
 
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 
